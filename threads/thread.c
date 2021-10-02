@@ -597,6 +597,7 @@ allocate_tid (void) {
 	return tid;
 }
 
+// current 를 sleep리스트에 저장하고 block 시켜줌
 void thread_sleep(int64_t ticks){
 	struct thread *cur;
 	enum intr_level old_level;
@@ -613,6 +614,7 @@ void thread_sleep(int64_t ticks){
 	intr_set_level(old_level);	// interrupt on  
 }
 
+// 해당 초가 지난 thread들을 unblock 하여 ready로 넣어줌
 void thread_awake(int64_t ticks)
 {
 	struct list_elem *e = list_begin(&sleep_list);

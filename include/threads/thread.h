@@ -28,6 +28,9 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+void thread_sleep(int64_t ticks);
+void thread_awake(int64_t ticks);
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -94,6 +97,8 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+	int64_t wakeup;						// 깨어나야 하는 시간 추가
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
