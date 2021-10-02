@@ -38,6 +38,10 @@ void cond_wait (struct condition *, struct lock *);
 void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 
+// sema 들의 우선순위 
+bool sema_compare_priority (const struct list_elem *l, const struct list_elem *s, void *aux UNUSED);
+
+
 /* Optimization barrier.
  *
  * The compiler will not reorder operations across an
