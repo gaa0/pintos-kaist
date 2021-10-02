@@ -195,8 +195,18 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	struct thread *cur = thread_current();
+
+	if (lock->holder){
+		cur->wait_on_lock = lock;	// 이미 누군가 lock을 들고 있다면, 현재 cur는 lock을 기다려야하며
+		list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_priority, 0); // 양보받는 쪽의 donations 리스트에 우선순위 맞춰서 연결하고 (내가 주었다!)
+		donate_priority();	// priority를 양보해주어야함
+	}
+
 	sema_down (&lock->semaphore);
-	lock->holder = thread_current ();
+
+	cur->wait_on_lock = NULL; // lock을 얻어서 들어갔다는거니 기다리고 있던거 해소었다는 소리. 기다리고 있는거 없음. NULL
+	lock->holder = cur;
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -228,6 +238,9 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+	remove_with_lock(lock);
+	refresh_priority();
 
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
@@ -333,6 +346,7 @@ cond_broadcast (struct condition *cond, struct lock *lock) {
 		cond_signal (cond, lock);
 }
 
+// bool sema_compare_priority (struct list_elem *l, struct list_elem *s, void *aux UNUSED)
 bool sema_compare_priority (const struct list_elem *l, const struct list_elem *s, void *aux UNUSED)
 {
 	struct semaphore_elem *l_sema = list_entry (l, struct semaphore_elem, elem);
@@ -344,3 +358,4 @@ bool sema_compare_priority (const struct list_elem *l, const struct list_elem *s
 	return list_entry (list_begin (waiter_l_sema), struct thread, elem)->priority
 		 > list_entry (list_begin (waiter_s_sema), struct thread, elem)->priority;
 }
+

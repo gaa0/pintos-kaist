@@ -63,6 +63,15 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+// donation
+// donation_elem 들을 priority 순으로 정리하는 함수
+bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux UNUSED);
+
+// donate 양보
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+
 // sleep 상태의 스레드들의 리스트를 따로 관리
 static struct list sleep_list;
 
@@ -325,7 +334,9 @@ thread_yield (void) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	thread_current ()->init_priority = new_priority;
+
+	refresh_priority();
 	thread_test_preemption();
 }
 
@@ -424,6 +435,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	// donation 위한 초기화
+	t->init_priority = priority; // 첫 priority 기록 남겨둠
+	t->wait_on_lock = NULL;	// 락 기다리는거 없음
+	list_init(&t->donations);	// 양보해주신 분들을 위한 리스트를 미리 마련
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -648,4 +664,50 @@ void thread_test_preemption(void)
 	if (!list_empty(&ready_list) && thread_current()->priority <
 	 list_entry(list_front(&ready_list), struct thread, elem)->priority)
 		thread_yield();
+}
+
+// donation_elem 들을 priority 순으로 정리하는 함수
+bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux UNUSED)
+{
+	return list_entry(l, struct thread, donation_elem)->priority > list_entry(s, struct thread, donation_elem)->priority;
+}
+
+void donate_priority(void)
+{
+	int depth;
+	struct thread *cur = thread_current();
+
+	for (depth = 0; depth < 8; depth++) {
+		if (!cur->wait_on_lock) break;
+			struct thread *holder = cur->wait_on_lock->holder;
+			holder->priority = cur->priority;
+			cur = holder;
+	}
+}
+
+void remove_with_lock(struct lock *lock)
+{
+	struct list_elem *e;
+	struct thread *cur = thread_current();
+
+	for (e = list_begin(&cur->donations); e != list_end(&cur->donations); e = list_next(e)){
+		struct thread *t = list_entry(e, struct thread, donation_elem);
+		if (t->wait_on_lock == lock)
+			list_remove(&t->donation_elem);
+	}
+}
+
+void refresh_priority(void)
+{
+	struct thread *cur = thread_current();
+
+	cur->priority = cur->init_priority;		// 현재 스레드를 초기 스레드 값으로 원복시켜줌 바로 밑에서 남은 또 빌려온거중에 제일 큰거랑 비교해서 큰 값을 설정해줄거임
+
+	if(!list_empty(&cur->donations)) {
+		list_sort(&cur->donations, thread_compare_donate_priority, 0);
+
+		struct thread *front = list_entry(list_front(&cur->donations), struct thread, donation_elem);
+		if (front->priority > cur->priority)
+			cur->priority = front->priority;
+	}
 }

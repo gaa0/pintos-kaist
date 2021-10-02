@@ -100,6 +100,13 @@ struct thread {
 
 	int64_t wakeup;						// 깨어나야 하는 시간 추가
 
+	int init_priority;	// 일시 양보받는 경우가 생기는데, 원래 우선순위 값으로 돌아가는 용
+
+	struct lock *wait_on_lock;	// 현재 이 스레드가 기다리고 있는 lock. release 되기를 기다리고 있음
+	struct list donations;		// 자신에게 priority를 나누어준 thread들의 리스트
+	struct list_elem donation_elem;		// 위의 리스트를 관리위한 element
+
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -150,5 +157,15 @@ void do_iret (struct intr_frame *tf);
 
 bool thread_compare_priority (struct list_elem *l, struct list_elem *s, void *aux UNUSED);
 void thread_test_preemption(void);
+
+// donation
+// donation_elem 들을 priority 순으로 정리하는 함수
+bool thread_compare_donate_priority(const struct list_elem *l, const struct list_elem *s, void *aux UNUSED);
+
+// donate 양보
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
+
 
 #endif /* threads/thread.h */
