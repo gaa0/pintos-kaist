@@ -63,6 +63,9 @@ static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
 
+// sleep 상태의 스레드들의 리스트를 따로 관리
+static struct list sleep_list;
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -78,6 +81,9 @@ static tid_t allocate_tid (void);
 // Because the gdt will be setup after the thread_init, we should
 // setup temporal gdt first.
 static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
+
+// sleep func
+void thread_sleep(int64_t ticks);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -109,6 +115,8 @@ thread_init (void) {
 	lock_init (&tid_lock);
 	list_init (&ready_list);
 	list_init (&destruction_req);
+
+	list_init (&sleep_list);	// sleep list
 
 	/* Set up a thread structure for the running thread. */
 	initial_thread = running_thread ();
@@ -587,4 +595,35 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+void thread_sleep(int64_t ticks){
+	struct thread *cur;
+	enum intr_level old_level;
+
+	old_level = intr_disable();	// interrupt off
+	cur = thread_current();
+
+	ASSERT(cur != idle_thread);
+
+	cur->wakeup = ticks;	// dlfdjskf tlrksdmf wjwkd
+	list_push_back(&sleep_list, &cur->elem);	// sleep_list 에 추가
+	thread_block();		// block 상태로 변경
+
+	intr_set_level(old_level);	// interrupt on  
+}
+
+void thread_awake(int64_t ticks)
+{
+	struct list_elem *e = list_begin(&sleep_list);
+
+	while (e != list_end(&sleep_list)) {
+		struct thread * t = list_entry(e, struct thread, elem);
+		if (t->wakeup <= ticks){
+			e = list_remove(e);
+			thread_unblock(t);
+		} else {
+			e = list_next(e);
+		}
+	}
 }
