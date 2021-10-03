@@ -28,8 +28,16 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+#define PRI_MAX 63               
+#define NICE_DEFAULT 0
+#define RECENT_CPU_DEFAULT 0
+#define LOAD_AVG_DEFAULT 0
+
 void thread_sleep(int64_t ticks);
 void thread_awake(int64_t ticks);
+
+static struct list all_list;
+
 
 /* A kernel thread or user process.
  *
@@ -106,6 +114,9 @@ struct thread {
 	struct list donations;		// 자신에게 priority를 나누어준 thread들의 리스트
 	struct list_elem donation_elem;		// 위의 리스트를 관리위한 element
 
+	// Multi Level Feedback Queue
+	int nice;	// 이게 높을 수록 우선순위를 양보하게됨
+	int recent_cpu;	// 최근에 얼마만큼 cpu를 점유하였느냐
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -119,6 +130,11 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+
+	// mlfq
+	
+	struct list_elem allelem;
+
 };
 
 /* If false (default), use round-robin scheduler.
@@ -166,6 +182,15 @@ bool thread_compare_donate_priority(const struct list_elem *l, const struct list
 void donate_priority(void);
 void remove_with_lock(struct lock *lock);
 void refresh_priority(void);
+
+// mlfq
+void mlfqs_calculate_priority (struct thread *t);	// 특정 thread의 prioirity 계산
+void mlfqs_calculate_recent_cpu (struct thread *t);	//스레드의 recent_cpu 계산하는 함수
+void mlfqs_calculate_load_avg (void); // load_avg 값을 계산
+
+void mlfqs_increment_recent_cpu (void);	// 현재 스레드의 recent_cpu 값을 1 증가시킴
+void mlfds_recalculate_recent_cpu (void);	// 모든 스레드의 recent_cpu 를 재계산 하는 함수
+void mlfqs_recalculate_priority (void);	//모든 스레드의 priority 재계산
 
 
 #endif /* threads/thread.h */

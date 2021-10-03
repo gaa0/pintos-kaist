@@ -195,11 +195,19 @@ lock_acquire (struct lock *lock) {
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
 
+	// MLFQ
+	if (thread_mlfqs) {
+		sema_down(&lock->semaphore);
+		lock->holder = thread_current();
+		return;
+	}
+
 	struct thread *cur = thread_current();
 
 	if (lock->holder){
 		cur->wait_on_lock = lock;	// 이미 누군가 lock을 들고 있다면, 현재 cur는 lock을 기다려야하며
-		list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_priority, 0); // 양보받는 쪽의 donations 리스트에 우선순위 맞춰서 연결하고 (내가 주었다!)
+		// list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_priority, 0); // 양보받는 쪽의 donations 리스트에 우선순위 맞춰서 연결하고 (내가 주었다!)
+		list_insert_ordered(&lock->holder->donations, &cur->donation_elem, thread_compare_donate_priority, 0); // 양보받는 쪽의 donations 리스트에 우선순위 맞춰서 연결하고 (내가 주었다!)
 		donate_priority();	// priority를 양보해주어야함
 	}
 
@@ -238,6 +246,13 @@ void
 lock_release (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (lock_held_by_current_thread (lock));
+
+	// MLFQ
+	lock->holder = NULL;
+	if (thread_mlfqs) {
+		sema_up(&lock->semaphore);
+		return;
+	}
 
 	remove_with_lock(lock);
 	refresh_priority();

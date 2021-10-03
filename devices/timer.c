@@ -127,6 +127,23 @@ static void
 timer_interrupt (struct intr_frame *args UNUSED) {
 	ticks++;
 	thread_tick ();
+
+	// init 파일에서 thread_mlfqs 값을 true로 해주면 mlfqs용이 돌아가고 false면 안돌아감 설정하는거임
+	/*
+		1 tick 마다 running 스레드의 recent_cpu 값 + 1
+		4 tick 마다 모든 스레드의 priority 재계산
+		1 초마다 모든 스레드의 recent_cpu 값과 load_avg 값 재계산
+	*/
+	if(thread_mlfqs) {
+		mlfqs_increment_recent_cpu();	// 1 tick 마다 running 스레드의 recent_cpu 값 +1
+		if (ticks % 4 == 0){	// 4tick 마다 모든 스레드의 priority 재계산
+			mlfqs_recalculate_priority();
+			if(ticks % TIMER_FREQ == 0){	// 1초? 0.1초마다 recent_cpu, load_avg 값 재계싼
+				mlfqs_recalculate_recent_cpu();
+				mlfqs_calculate_load_avg();
+			}
+		}
+	}
 	thread_awake(ticks); // 일어나야할 thread을 깨워줌
 }
 
