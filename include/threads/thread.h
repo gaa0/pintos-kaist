@@ -145,6 +145,11 @@ struct thread {
 	struct semaphore wait_sema; // used by parent to wait for child
 	int exit_status;			// used to deliver child exit_status to parent
 
+	// 2-3 fork syscall
+	struct intr_frame parent_if; // to preserve my current intr_frame and pass it down to child in fork ('parent_if' in child's perspective);
+	struct semaphore fork_sema; // parent wait (process_wait) until child fork completes (__do_fork)
+	struct semaphore free_sema; // Postpone child termination (process_exit) until parent receives its exit_status in 'wait' (process_wait)
+
 };
 
 /* If false (default), use round-robin scheduler.

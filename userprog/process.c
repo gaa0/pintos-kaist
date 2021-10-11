@@ -80,8 +80,19 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	struct thread *cur = thread_current();
+	memcpy(&cur->parent_if, if_, sizeof(struct intr_frame));
+
+	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, cur);
+	if (tid == TID_ERROR)
+		return TID_ERROR;
+
+	struct thread *child = get_child_with_pid(tid);
+	sema_down(&child->fork_sema); // wait until child loads
+	if (child->exit_status == -1)
+		return TID_ERROR;
+
+	return tid;
 }
 
 #ifndef VM
@@ -127,17 +138,22 @@ __do_fork (void *aux) {
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
+
+	parent_if = &parent->parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0; // 뭐얍 레지스터 값도 바꿔서 주나 // fork return for child
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
 		goto error;
 
-	process_activate (current);
+	// 약 530번째 줄, pml4_activate, tss_update
+	process_activate (current); 
+
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
@@ -153,13 +169,20 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	process_init ();
+	// process_init ();
+
+	// if child loaded successfully, wake up parent in process_fork
+	sema_up(&current->fork_sema);
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
 error:
-	thread_exit ();
+	current->exit_status = TID_ERROR;
+	sema_up(&current->fork_sema);
+	exit(TID_ERROR);
+
+	// thread_exit ();
 }
 
 /* Switch the current execution context to the f_name.
@@ -211,7 +234,7 @@ process_exec (void *f_name) {
 	_if.R.rdi = argc;
 	_if.R.rsi = (uint64_t)*rspp + sizeof(void *);
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)*rspp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)*rspp, true);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);

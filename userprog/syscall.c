@@ -20,7 +20,7 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
-void check_address(void *uaddr);
+void check_address(const uint64_t *uaddr);
 
 void halt (void);
 void exit (int status);
@@ -38,6 +38,8 @@ int dup2(int oldfd, int newfd);
 
 tid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (const char *cmd_line);
+
+// temp
 
 /* System call.
  *
@@ -117,7 +119,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_WRITE:
-		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
+		f->R.rax = _write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK:
 		seek(f->R.rdi, f->R.rsi);
@@ -136,8 +138,8 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		break;
 	}
 
-	printf ("system call!\n");
-	thread_exit ();
+	// printf ("system call!\n");
+	// thread_exit ();
 	/*
 		procedure syscall_handler (interrupt frame)
 			get stack pointer from interrupt frame
@@ -156,7 +158,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	*/
 }
 
-void check_address(void *uaddr)
+void check_address(const uint64_t *uaddr)
 {
 	/* 포인터가 가리키는 주소가 유저영역의 주소인지 확인 */
 
@@ -260,10 +262,17 @@ int dup2(int oldfd, int newfd)
 
 tid_t fork (const char *thread_name, struct intr_frame *f)
 {
-
+	return process_fork(thread_name, f);
 }
 
 int exec (const char *cmd_line)
 {
 
+}
+
+// temp
+int _write (int fd UNUSED, const void *buffer, unsigned size) {
+	// temporary code to pass args related test case
+	putbuf(buffer, size);
+	return size;
 }
