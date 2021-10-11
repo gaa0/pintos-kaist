@@ -10,4 +10,7 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+// Project 2-3 Parent child
+struct thread *get_child_with_pid(int pid);
+
 #endif /* userprog/process.h */

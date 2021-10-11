@@ -1,9 +1,9 @@
-#include "userprog/syscall.h"
+#include "userprog/syscall.h" //
 #include <stdio.h> //
-#include <syscall-nr.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "threads/loader.h"
+#include <syscall-nr.h> // 
+#include "threads/interrupt.h" //
+#include "threads/thread.h" //
+#include "threads/loader.h" // 
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
@@ -12,7 +12,9 @@
 #include "filesys/filesys.h"
 #include "filesys/file.h"
 #include <list.h>
-
+#include "threads/palloc.h"
+#include "threads/vaddr.h"
+#include "userprog/process.h"
 
 
 void syscall_entry (void);
@@ -193,6 +195,8 @@ void exit (int status)
 	출력 양식: “프로세스이름: exit(종료상태)” */
 	/* 스레드 종료 */
 	struct thread *cur = thread_current();
+	cur->exit_status = status;
+
 	printf("%s: exit(%d)\n", thread_name(), status); // Process Termination Message
 	thread_exit();
 }

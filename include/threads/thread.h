@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "threads/synch.h"
 #include "threads/interrupt.h"
 #ifdef VM
 #include "vm/vm.h"
@@ -134,6 +135,15 @@ struct thread {
 	// mlfq
 	
 	struct list_elem allelem;
+
+	/* Project 2 */
+	// 2-3 Parent-child hierachy
+	struct list child_list;	// keep children
+	struct list_elem child_elem;	// used to put current thread into 'children' list
+
+	// 2-3 wait syscall
+	struct semaphore wait_sema; // used by parent to wait for child
+	int exit_status;			// used to deliver child exit_status to parent
 
 };
 

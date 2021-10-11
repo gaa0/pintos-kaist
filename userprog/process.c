@@ -51,8 +51,8 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	// Project 2-1. Pass args - extract program name
-	char *save_prt;
-	strtok_r(file_name, " ", &save_prt);
+	char *save_ptr;
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
@@ -275,11 +275,57 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for (int i=0; i <= 10000000; i++ ){
-		
-	};
+	/*
 
-	return -1;
+	/*
+		sema_init()
+		sema_down
+	 * /
+
+	Wait for a child process pid to exit and retrieve the child’s exit status.
+	 If pid is alive, wait till it terminates. Returns the status that pid passed to
+	exit.
+
+	 If pid did not call exit, but was terminated by the kernel, return -1.
+	
+	
+	 A parent process can call wait for the child process that has terminated.
+	→ return exit status of the terminated child process.
+	
+	 After the child terminates, the parent should deallocate its process
+	descriptor
+	ㄴ child list 에서 제거
+	
+	 wait fails and return -1 if
+	
+	 pid does not refer to a direct child of the calling process.
+	
+	 The process that calls wait has already called wait on pid.
+
+	 Search the descriptor of the child process by using child_tid.
+	
+	 The caller blocks until the child process exits.
+	
+	 Once child process exits, deallocate the descriptor of child process and returns
+	exit status of the child process.
+	
+	*/
+
+	struct thread *cur = thread_current();
+
+	struct thread *child = get_child_with_pid(child_tid);
+
+	// if failed
+	if (child == NULL)
+		return -1;
+	
+	// Parent waits until child signals (sema_up) after its execution
+	sema_down(&child->wait_sema);
+
+	int exit_status = child->exit_status;
+	list_remove(&child->child_elem);
+
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -292,6 +338,9 @@ process_exit (void) {
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
 	process_cleanup ();
+
+	// Wake up blocked parent
+	sema_up(&curr->wait_sema);
 }
 
 /* Free the current process's resources. */
@@ -712,3 +761,17 @@ setup_stack (struct intr_frame *if_) {
 	return success;
 }
 #endif /* VM */
+
+struct thread *get_child_with_pid(int pid)
+{
+	struct thread *cur = thread_current();
+	struct list *child_list = &cur->child_list;
+
+	for (struct list_elem *e = list_begin(child_list); e!= list_end(child_list); e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread, child_elem);
+		if (t->tid == pid)
+			return t;
+	}	
+	return NULL;
+}
