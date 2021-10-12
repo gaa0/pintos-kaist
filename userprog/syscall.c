@@ -37,7 +37,8 @@ void close(int fd);
 int dup2(int oldfd, int newfd);
 
 tid_t fork (const char *thread_name, struct intr_frame *f);
-int exec (const char *cmd_line);
+int exec (char *file_name);
+// int exec (const char *cmd_line);
 
 // temp
 
@@ -265,9 +266,27 @@ tid_t fork (const char *thread_name, struct intr_frame *f)
 	return process_fork(thread_name, f);
 }
 
-int exec (const char *cmd_line)
+// int exec (const char *cmd_line);
+int exec (char *file_name)
 {
+	struct thread *cur = thread_current(); // 이건 왜 넣었지?
+	check_address(file_name);
 
+
+	int siz = strlen(file_name) + 1;
+	char *fn_copy = palloc_get_page(PAL_ZERO);
+	if (fn_copy == NULL)
+		exit(-1);
+	strlcpy(fn_copy, file_name, siz);
+
+	if (process_exec(fn_copy) == -1)
+		return -1;
+
+	// Not reachable
+	NOT_REACHED();
+
+	// 동적할당된거 free안시켜줘도 되나 - process_exec 넘어가서 해줌
+	return 0;
 }
 
 // temp

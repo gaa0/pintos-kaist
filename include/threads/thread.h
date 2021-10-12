@@ -150,6 +150,8 @@ struct thread {
 	struct semaphore fork_sema; // parent wait (process_wait) until child fork completes (__do_fork)
 	struct semaphore free_sema; // Postpone child termination (process_exit) until parent receives its exit_status in 'wait' (process_wait)
 
+	// 부모 프로세스의 디스크립터는 없어도 되나?
+	
 };
 
 /* If false (default), use round-robin scheduler.
