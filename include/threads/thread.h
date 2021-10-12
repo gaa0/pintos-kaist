@@ -151,7 +151,14 @@ struct thread {
 	struct semaphore free_sema; // Postpone child termination (process_exit) until parent receives its exit_status in 'wait' (process_wait)
 
 	// 부모 프로세스의 디스크립터는 없어도 되나?
+
+	// 2-4 file descripter
+	struct file **fdTable;	// allocation in threac_create (thread.c)
+	int fdIdx;				// an index of an open spot in fdTable
 	
+
+	int stdin_count;
+	int stdout_count;
 };
 
 /* If false (default), use round-robin scheduler.
@@ -209,5 +216,8 @@ void mlfqs_increment_recent_cpu (void);	// 현재 스레드의 recent_cpu 값을
 void mlfds_recalculate_recent_cpu (void);	// 모든 스레드의 recent_cpu 를 재계산 하는 함수
 void mlfqs_recalculate_priority (void);	//모든 스레드의 priority 재계산
 
+// 2-4 syscall - fork
+#define FDT_PAGES 3	// pages to allocate for file descriptor tables (thread_create, process_exit)
+#define FDCOUNT_LIMIT FDT_PAGES *(1 << 9)	// Limit fdIdx
 
 #endif /* threads/thread.h */

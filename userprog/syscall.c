@@ -30,7 +30,8 @@ bool remove(const char *file);
 int open(const char *file);
 int filesize(int fd);
 int read(int fd, void *buffer, unsigned size);
-// int write(int fd, const void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
+
 int _write (int fd UNUSED, const void *buffer, unsigned size);
 
 
@@ -136,7 +137,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_WRITE:
-		f->R.rax = _write(f->R.rdi, f->R.rsi, f->R.rdx);
+		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 	case SYS_SEEK:
 		seek(f->R.rdi, f->R.rsi);
@@ -238,7 +239,19 @@ bool remove(const char *file)
 
 int open(const char *file)
 {
+	check_address(file);
+	struct file *fileobj = filesys_open(file);
 
+	if (fileobj == NULL)
+		return -1;
+
+	int fd = add_file_to_fdt(fileobj);
+
+	// FD table full
+	if (fd == -1)
+		file_close(fileobj);
+
+	return fd;
 }
 
 int filesize(int fd)
@@ -294,14 +307,51 @@ int read(int fd, void *buffer, unsigned size)
 	return ret;
 }
 
+// Writes size bytes from buffer to the open file fd.
+// Returns the number of bytes actually written, or -1 if the file could not be written
 int write(int fd, const void *buffer, unsigned size)
 {
+	check_address(buffer);
+	int ret;
 
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj == NULL)
+		return -1;
+
+	struct thread *cur = thread_current();
+	
+	if (fileobj == STDOUT)
+	{
+		if(cur->stdout_count == 0)
+		{
+			//Not reachable
+			NOT_REACHED();
+			remove_file_from_fdt(fd);
+			ret = -1;
+		}
+		else
+		{
+			putbuf(buffer, size);
+			ret = size;
+		}
+	}
+	else if (fileobj == STDIN)
+	{
+		ret = -1;
+	}
+	else
+	{
+		lock_acquire(&file_rw_lock);
+		ret = file_write(fileobj, buffer, size);
+		lock_release(&file_rw_lock);
+	}
+
+	return ret;
 }
 
 void seek(int fd, unsigned position)
 {
-
+	
 }
 
 unsigned tell(int fd)
@@ -373,6 +423,9 @@ int add_file_to_fdt(struct file *file)
 {
 	struct thread *cur = thread_current();
 	struct file **fdt = cur->fdTable;	// file descriptor table
+
+	while (cur->fdIdx < FDCOUNT_LIMIT && fdt[cur->fdIdx])
+		cur->fdIdx++;
 
 	// Error - fdt full
 	if (cur->fdIdx >= FDCOUNT_LIMIT)
