@@ -20,7 +20,7 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
-void check_address(const uint64_t *uaddr);
+void check_address(uaddr);
 
 void halt (void);
 void exit (int status);
@@ -30,7 +30,10 @@ bool remove(const char *file);
 int open(const char *file);
 int filesize(int fd);
 int read(int fd, void *buffer, unsigned size);
-int write(int fd, const void *buffer, unsigned size);
+// int write(int fd, const void *buffer, unsigned size);
+int _write (int fd UNUSED, const void *buffer, unsigned size);
+
+
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
