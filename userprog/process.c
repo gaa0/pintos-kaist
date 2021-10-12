@@ -392,6 +392,15 @@ process_exit (void) {
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// P2-4 CLose all opened files
+	for (int i = 0; i < FDCOUNT_LIMIT; i++)
+	{
+		close(i);
+	}
+
+	// palloc_free_page(cur->fdTable);
+	palloc_free_multiple(curr->fdTable, FDT_PAGES); // multi-oom
+
 	process_cleanup ();
 
 	// Wake up blocked parent
@@ -600,7 +609,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file); 이거 주석 맞나..? 무지성 주석처리;
 	return success;
 }
 

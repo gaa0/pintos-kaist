@@ -41,7 +41,17 @@ int dup2(int oldfd, int newfd);
 
 tid_t fork (const char *thread_name, struct intr_frame *f);
 int exec (char *file_name);
+
+// Project 2-4 File Descriptor
+static struct file *find_file_by_fd(int fd);
+int add_file_to_fdt(struct file *file);
+void remove_file_from_fdt(int fd);
 // int exec (const char *cmd_line);
+
+/* Project2-extra */
+const int STDIN = 1;
+const int STDOUT = 2;
+
 
 // temp
 
@@ -69,6 +79,9 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+
+	// Project 2-4. File descriptor
+	lock_init(&file_rw_lock);
 }
 
 /* The main system call interface */
@@ -233,9 +246,52 @@ int filesize(int fd)
 
 }
 
+// Reads size bytes from the file open as fd into buffer.
+// Returns the number of bytes actually read (0 at end of file), or -1 if the file could not be read
 int read(int fd, void *buffer, unsigned size)
 {
+	check_address(buffer);
+	int ret;
+	struct thread *cur = thread_current();
 
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj == NULL)
+		return -1;
+
+	if (fileobj == STDIN)
+	{
+		if (cur->stdin_count == 0)
+		{
+			// Not reachable
+			NOT_REACHED();
+			remove_file_from_fdt(fd);
+			ret = -1;
+		}
+		else
+		{
+			int i;
+			unsigned char *buf = buffer;
+			for (i = 0; i < size; i++)
+			{
+				char c = input_getc();
+				*buf++ = c;
+				if (c == '\0')
+					break;
+			}
+			ret = i;
+		}
+	}
+	else if (fileobj == STDOUT)
+	{
+		ret = -1;
+	}
+	else{
+		// Q. read는 동시접근 허용 안되나?
+		lock_acquire(&file_rw_lock);
+		ret = file_read(fileobj, buffer, size);
+		lock_release(&file_rw_lock);
+	}
+	return ret;
 }
 
 int write(int fd, const void *buffer, unsigned size)
@@ -297,4 +353,43 @@ int _write (int fd UNUSED, const void *buffer, unsigned size) {
 	// temporary code to pass args related test case
 	putbuf(buffer, size);
 	return size;
+}
+
+// Project 2-4. File descriptor
+// Check if given fd is valid, return cur->fdTable[fd]
+static struct file *find_file_by_fd(int fd)
+{
+	struct thread *cur = thread_current();
+
+	// Error - invalid id
+	if (fd < 0 || fd >= FDCOUNT_LIMIT)
+		return NULL;
+	
+	return cur->fdTable[fd];	// automatically returns NULL if empty
+}
+
+// Find open spot in current thread's fdt and put file in it. Returns the fd.
+int add_file_to_fdt(struct file *file)
+{
+	struct thread *cur = thread_current();
+	struct file **fdt = cur->fdTable;	// file descriptor table
+
+	// Error - fdt full
+	if (cur->fdIdx >= FDCOUNT_LIMIT)
+		return -1;
+
+	fdt[cur->fdIdx] = file;
+	return cur->fdIdx;
+}
+
+// Check for valid fd and do cur -> fdTable[fd] = NULL. Returns nothing
+void remove_file_from_fdt(int fd)
+{
+	struct thread *cur = thread_current();
+
+	// Error - invalid fd
+	if (fd < 0 || fd >= FDCOUNT_LIMIT)
+		return;
+
+	cur->fdTable[fd] = NULL;
 }
