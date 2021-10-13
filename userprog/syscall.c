@@ -303,7 +303,6 @@ int read(int fd, void *buffer, unsigned size)
 		ret = -1;
 	}
 	else{
-		// Q. read는 동시접근 허용 안되나?
 		lock_acquire(&file_rw_lock);
 		ret = file_read(fileobj, buffer, size);
 		lock_release(&file_rw_lock);
@@ -380,6 +379,7 @@ void close(int fd)
 
 	struct thread *cur = thread_current();
 
+	// extra 라고함 - 홍욱형
 	if (fd == 0 || fileobj == STDIN)
 	{
 		cur->stdin_count--;
@@ -388,6 +388,7 @@ void close(int fd)
 	{
 		cur->stdout_count--;
 	}
+	// extra 라고함 - 홍욱형
 
 	remove_file_from_fdt(fd);
 	if (fd <= 1 || fileobj <= 2)
@@ -403,14 +404,14 @@ void close(int fd)
 // After dup2, oldfd and newfd 'shares' struct file, but closing newfd should not close oldfd (important!)
 int dup2(int oldfd, int newfd)
 {
+	if (oldfd == newfd)
+		return newfd;
+
 	struct file *fileobj = find_file_by_fd(oldfd);
 	if (fileobj == NULL)
 		return -1;
 
-	struct file *deadfile = find_file_by_fd(newfd);
-
-	if (oldfd == newfd)
-		return newfd;
+	// struct file *deadfile = find_file_by_fd(newfd);
 
 	struct thread *cur = thread_current();
 	struct file **fdt = cur->fdTable;
