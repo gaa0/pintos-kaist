@@ -254,9 +254,13 @@ int open(const char *file)
 	return fd;
 }
 
+// Returns the size, in bytes, of the file open as fd.
 int filesize(int fd)
 {
-
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj == NULL)
+		return -1;
+	return file_length(fileobj);
 }
 
 // Reads size bytes from the file open as fd into buffer.
