@@ -156,6 +156,10 @@ struct thread {
 	struct file **fdTable;	// allocation in threac_create (thread.c)
 	int fdIdx;				// an index of an open spot in fdTable
 
+	// 2- extra
+	
+	// 2-extra - count the number of open stdin/stdout
+	// dup2 may copy stdin or stdout; stdin or stdout is not really closed until these counts goes 0
 	int stdin_count;
 	int stdout_count;
 

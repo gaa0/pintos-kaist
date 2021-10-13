@@ -148,6 +148,14 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 }
 #endif
 
+// Project2-extra
+struct MapElem
+{
+	uintptr_t key;
+	uintptr_t value;
+};
+
+
 /* A thread function that copies parent's execution context.
  * Hint) parent->tf does not hold the userland context of the process.
  *       That is, you are required to pass second argument of process_fork to
@@ -190,7 +198,53 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	// process_init ();
+	// multi-oom) Failed to duplicate?
+	if (parent->fdIdx == FDCOUNT_LIMIT)
+		goto error;
+
+	// Project2-extra) multiple fds sharing same file - use associative map (e.g. dict, hashmap) to duplicate these relationships
+	// other test-cases like multi-oom don't need this feature
+	const int MAPLEN = 10;
+	struct MapElem map[10]; // key - parent's struct file * , value - child's newly created struct file *
+	int dupCount = 0;		// index for filling map
+
+	for (int i = 0; i < FDCOUNT_LIMIT; i++)
+	{
+		struct file *file = parent->fdTable[i];
+		if (file == NULL)
+			continue;
+
+		// Project2-extra) linear search on key-pair array
+		// If 'file' is already duplicated in child, don't duplicate again but share it
+		bool found = false;
+		for (int j = 0; j < MAPLEN; j++)
+		{
+			if (map[j].key == file)
+			{
+				found = true;
+				current->fdTable[i] = map[j].value;
+				break;
+			}
+		}
+		if (!found)
+		{
+			struct file *new_file;
+			if (file > 2)
+				new_file = file_duplicate(file);
+			else
+				new_file = file; // 1 STDIN, 2 STDOUT
+
+			current->fdTable[i] = new_file;
+			if (dupCount < MAPLEN)
+			{
+				map[dupCount].key = file;
+				map[dupCount++].value = new_file;
+			}
+		}
+	}
+	current->fdIdx = parent->fdIdx;
+
+
 
 	// if child loaded successfully, wake up parent in process_fork
 	sema_up(&current->fork_sema);
@@ -379,6 +433,7 @@ process_wait (tid_t child_tid UNUSED) {
 
 	int exit_status = child->exit_status;
 	list_remove(&child->child_elem);
+	sema_up(&child->free_sema);
 
 	return exit_status;
 }
@@ -408,6 +463,9 @@ process_exit (void) {
 
 	// Wake up blocked parent
 	sema_up(&curr->wait_sema);
+	
+	// Postpone child termination until parents receives its exit status with 'wait'
+	sema_down(&curr->free_sema);
 }
 
 /* Free the current process's resources. */
@@ -838,7 +896,11 @@ struct thread *get_child_with_pid(int pid)
 	struct thread *cur = thread_current();
 	struct list *child_list = &cur->child_list;
 
-	for (struct list_elem *e = list_begin(child_list); e!= list_end(child_list); e = list_next(e))
+#ifdef DEBUG_WAIT
+	printf("\nparent children # : %d\n", list_size(child_list));
+#endif
+
+	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
 	{
 		struct thread *t = list_entry(e, struct thread, child_elem);
 		if (t->tid == pid)

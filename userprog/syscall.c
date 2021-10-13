@@ -395,9 +395,36 @@ void close(int fd)
 		fileobj->dupCount--;
 }
 
+// Creates 'copy' of oldfd into newfd. If newfd is open, close it. Returns newfd on success, -1 on fail (invalid oldfd)
+// After dup2, oldfd and newfd 'shares' struct file, but closing newfd should not close oldfd (important!)
 int dup2(int oldfd, int newfd)
 {
+	struct file *fileobj = find_file_by_fd(oldfd);
+	if (fileobj == NULL)
+		return -1;
 
+	struct file *deadfile = find_file_by_fd(newfd);
+
+	if (oldfd == newfd)
+		return newfd;
+
+	struct thread *cur = thread_current();
+	struct file **fdt = cur->fdTable;
+
+	// Don't literally copy, but just increase its count and share the same struct file
+	// [syscall close] Only close it when count == 0
+
+	// Copy stdin or stdout to another fd
+	if (fileobj == STDIN)
+		cur->stdin_count++;
+	else if (fileobj == STDOUT)
+		cur->stdout_count++;
+	else
+		fileobj->dupCount++;
+
+	close(newfd);
+	fdt[newfd] = fileobj;
+	return newfd;
 }
 
 
@@ -455,6 +482,7 @@ int add_file_to_fdt(struct file *file)
 	struct thread *cur = thread_current();
 	struct file **fdt = cur->fdTable;	// file descriptor table
 
+	// Project2-extra - (multi-oom) Find open spot from the front
 	while (cur->fdIdx < FDCOUNT_LIMIT && fdt[cur->fdIdx])
 		cur->fdIdx++;
 
