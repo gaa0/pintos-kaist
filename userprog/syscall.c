@@ -349,19 +349,50 @@ int write(int fd, const void *buffer, unsigned size)
 	return ret;
 }
 
+// Changes the next byte to be read or written in open file fd to position,
+// expressed in bytes from the beginning of the file (Thus, a position of 0 is the file's start).
 void seek(int fd, unsigned position)
 {
-	
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj <= 2)
+		return;
+	fileobj->pos = position;	
 }
 
+// Returns the position of the next byte to be read or written in open file fd, expressed in bytes from the beginning of the file.
 unsigned tell(int fd)
 {
-
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj <= 2)
+		return;
+	return file_tell(fileobj);
 }
 
 void close(int fd)
 {
+	struct file *fileobj = find_file_by_fd(fd);
+	if (fileobj == NULL)
+		return;
 
+	struct thread *cur = thread_current();
+
+	if (fd == 0 || fileobj == STDIN)
+	{
+		cur->stdin_count--;
+	}
+	else if (fd == 1 || fileobj == STDOUT)
+	{
+		cur->stdout_count--;
+	}
+
+	remove_file_from_fdt(fd);
+	if (fd <= 1 || fileobj <= 2)
+		return;
+
+	if (fileobj -> dupCount == 0)
+		file_close(fileobj);
+	else
+		fileobj->dupCount--;
 }
 
 int dup2(int oldfd, int newfd)

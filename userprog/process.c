@@ -401,6 +401,9 @@ process_exit (void) {
 	// palloc_free_page(cur->fdTable);
 	palloc_free_multiple(curr->fdTable, FDT_PAGES); // multi-oom
 
+	// P2-5 Close current executable run by this process
+	file_close(curr->running);
+
 	process_cleanup ();
 
 	// Wake up blocked parent
@@ -529,6 +532,10 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
+	// Project 2-5. Deny writes to running exec
+	t->running = file;
+	file_deny_write(file);
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr

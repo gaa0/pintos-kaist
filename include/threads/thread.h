@@ -155,10 +155,12 @@ struct thread {
 	// 2-4 file descripter
 	struct file **fdTable;	// allocation in threac_create (thread.c)
 	int fdIdx;				// an index of an open spot in fdTable
-	
 
 	int stdin_count;
 	int stdout_count;
+
+	// 2-5 deny exec writes
+	struct file *running; // executable ran by current process (process.c load, process_exit) 
 };
 
 /* If false (default), use round-robin scheduler.

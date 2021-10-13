@@ -2,6 +2,17 @@
 #define FILESYS_FILE_H
 
 #include "filesys/off_t.h"
+#include <stdbool.h>
+
+/* An open file. */
+struct file
+{
+	struct inode *inode; /* File's inode. */
+	off_t pos;			 /* Current position. */
+	bool deny_write;	 /* Has file_deny_write() been called? */
+	//project2-extra
+	int dupCount; // how many fds share this file? only really 'close' this file when dupCount == 0
+};
 
 struct inode;
 

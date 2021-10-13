@@ -141,7 +141,6 @@ thread_init (void) {
 	initial_thread->status = THREAD_RUNNING;
 	initial_thread->tid = allocate_tid ();
 
-
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -500,6 +499,9 @@ init_thread (struct thread *t, const char *name, int priority) {
 	sema_init(&t->wait_sema, 0);
 	sema_init(&t->fork_sema, 0);
 	sema_init(&t->free_sema, 0);
+
+	// 2-5
+	t->running = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
